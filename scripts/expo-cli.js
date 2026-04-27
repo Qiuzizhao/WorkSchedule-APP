@@ -2,8 +2,6 @@ const { spawn } = require('child_process');
 
 const DEFAULT_PROXY = 'http://127.0.0.1:7897';
 const DEFAULT_NO_PROXY = 'localhost,127.0.0.1,::1';
-const OUTPUT_BUFFER_SIZE = 20000;
-
 function buildEnv() {
   const proxy =
     process.env.CLASH_HTTP_PROXY ||
@@ -30,24 +28,11 @@ function runExpo(args) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [require.resolve('expo/bin/cli'), ...args], {
       env: buildEnv(),
-      stdio: ['inherit', 'pipe', 'pipe'],
+      stdio: 'inherit',
     });
 
-    let output = '';
-
-    const forward = (stream, target) => {
-      stream.on('data', (chunk) => {
-        const text = chunk.toString();
-        output = (output + text).slice(-OUTPUT_BUFFER_SIZE);
-        target.write(chunk);
-      });
-    };
-
-    forward(child.stdout, process.stdout);
-    forward(child.stderr, process.stderr);
-
     child.on('error', reject);
-    child.on('close', (code) => resolve({ code: code ?? 0, output }));
+    child.on('close', (code) => resolve({ code: code ?? 0 }));
   });
 }
 
@@ -60,7 +45,7 @@ async function main() {
     process.exit(0);
   }
 
-  if (shouldRetryOffline && /fetch failed/i.test(firstRun.output)) {
+  if (shouldRetryOffline) {
     console.warn('\nExpo online check failed. Retrying in offline mode with normalized proxy settings...');
     const retryRun = await runExpo([...args, '--offline']);
     process.exit(retryRun.code);
